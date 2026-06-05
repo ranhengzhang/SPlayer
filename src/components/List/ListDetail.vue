@@ -34,16 +34,20 @@
           </div>
         </div>
         <div class="data">
-          <n-h2 class="name text-hidden">
+          <n-h2 class="name user-select-text">
             <n-ellipsis
               v-if="config.titleType === 'ellipsis'"
               :line-clamp="1"
               :tooltip="{ placement: 'bottom' }"
             >
-              {{ titleText }}
+              <span @click="handleTitleClick">
+                {{ titleText }}
+              </span>
             </n-ellipsis>
             <template v-else>
-              {{ titleText }}
+              <span @click="handleTitleClick">
+                {{ titleText }}
+              </span>
               <!-- 隐私歌单 -->
               <n-popover v-if="detailData?.privacy === 10" :show-arrow="false" placement="right">
                 <template #trigger>
@@ -53,6 +57,11 @@
               </n-popover>
             </template>
           </n-h2>
+          <n-collapse-transition class="collapse">
+            <n-text v-if="detailData?.alias?.length" class="name-alias user-select-text" depth="3">
+              <span v-for="(alia, index) in detailData.alias" :key="index" v-text="alia" />
+            </n-text>
+          </n-collapse-transition>
           <n-collapse-transition :show="!listScrolling" class="collapse">
             <!-- 简介 -->
             <n-text
@@ -325,6 +334,15 @@ const handleTagClick = (tag: string) => {
   });
 };
 
+// 处理标题点击
+const handleTitleClick = () => {
+  if (titleText.value) {
+    const title =
+      props.titleText || (props.config.titleType === "ellipsis" ? "专辑标题" : "节目标题");
+    openDescModal(titleText.value, title);
+  }
+};
+
 // 处理描述点击
 const handleDescriptionClick = () => {
   if (props.detailData?.description) {
@@ -456,10 +474,18 @@ const handleTabChange = (value: "songs" | "comments") => {
           transform: translateY(2px);
         }
       }
+      .name-alias {
+        &::before {
+          content: "(";
+        }
+        &::after {
+          content: ")";
+        }
+        span:not(:last-child)::after {
+          content: "; ";
+        }
+      }
       .collapse {
-        position: absolute;
-        left: 0;
-        top: 60px;
         margin-bottom: 12px;
       }
       .meta {

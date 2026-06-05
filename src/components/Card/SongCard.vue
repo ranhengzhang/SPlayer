@@ -38,17 +38,20 @@
               }"
               class="name-text"
             >
-              {{
-                settingStore.hideBracketedContent
-                  ? removeBrackets(song?.name)
-                  : song?.name || "未知曲目"
-              }}
+              <span
+                class="user-select-text"
+                v-text="
+                  settingStore.hideBracketedContent
+                    ? removeBrackets(song?.name)
+                    : song?.name || '未知曲目'
+                "
+              />
               <n-text
                 v-if="song.alia?.length && !settingStore.hideBracketedContent"
-                class="alia"
+                class="alia user-select-text"
                 depth="3"
               >
-                ({{ song.alia }})
+                {{ song.alia }}
               </n-text>
             </n-ellipsis>
           </div>
@@ -65,7 +68,7 @@
             <!-- 原唱翻唱 -->
             <template v-if="settingStore.showSongOriginalTag">
               <n-tag v-if="song.originCoverType === 1" :bordered="false" type="primary" round>
-                原
+                原唱
               </n-tag>
               <n-tag v-if="song.originCoverType === 2" :bordered="false" type="info" round>
                 翻唱
@@ -113,7 +116,7 @@
             </n-tag>
             <!-- 歌手 -->
             <template v-if="settingStore.showSongArtist">
-              <div v-if="Array.isArray(song.artists)" class="artists">
+              <div v-if="Array.isArray(song.artists)" class="artists user-select-text">
                 <n-text
                   v-for="ar in song.artists"
                   :key="ar.id"
@@ -126,7 +129,7 @@
               <div v-else-if="song.type === 'radio'" class="artists">
                 <n-text class="ar"> 电台节目 </n-text>
               </div>
-              <div v-else class="artists" @click="openJumpArtist(song.artists)">
+              <div v-else class="artists user-select-text" @click="openJumpArtist(song.artists)">
                 <n-text class="ar">
                   {{
                     settingStore.hideBracketedContent
@@ -146,7 +149,7 @@
       >
         <n-text
           v-if="isObject(song.album)"
-          class="album-text"
+          class="album-text user-select-text"
           @click="
             router.push({
               name: 'album',
@@ -156,7 +159,7 @@
         >
           {{ albumName }}
         </n-text>
-        <n-text v-else class="album-text">
+        <n-text v-else class="album-text user-select-text">
           {{ albumName }}
         </n-text>
       </div>
@@ -359,6 +362,14 @@ const albumName = computed(() => {
         align-items: center;
         line-height: normal;
         font-size: 16px;
+        .alia {
+          &::before {
+            content: " (";
+          }
+          &::after {
+            content: ") ";
+          }
+        }
       }
       .desc {
         min-width: 0;
