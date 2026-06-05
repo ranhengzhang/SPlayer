@@ -161,8 +161,8 @@
 </template>
 
 <script setup lang="ts">
-import { LyricLine, LyricWord } from "@applemusic-like-lyrics/lyric";
-import { calculateLyricIndex } from "@/utils/calc";
+import { LyricWord } from "@applemusic-like-lyrics/lyric";
+import { calculateLyricIndex, getSafeEndTime } from "@/utils/calc";
 import { LyricConfig, LyricData, RenderLine } from "@/types/desktop-lyric";
 import defaultDesktopLyricConfig from "@/assets/data/lyricConfig";
 
@@ -181,6 +181,15 @@ const lyricData = reactive<LyricData>({
   yrcData: [],
   lyricIndex: -1,
 });
+
+const hasLyricLines = (data: Pick<LyricData, "lrcData" | "yrcData">) =>
+  Boolean(data.lrcData?.length || data.yrcData?.length);
+
+const shouldIgnoreLoadingUpdate = (data: LyricData) => {
+  if (data.lyricLoading !== true) return false;
+  if (hasLyricLines(data) || !hasLyricLines(lyricData)) return false;
+  return data.songId === undefined || data.songId === lyricData.songId;
+};
 
 // 锚点时间（毫秒）与锚点帧时间，用于插值推进
 let baseMs = 0;
@@ -248,26 +257,6 @@ const handleMouseLeave = () => {
 };
 
 /**
- * 计算安全的结束时间
- * - 优先使用当前行的 `endTime`
- * - 若为空则使用下一行的 `time` 作为当前行的结束参照
- * @param lyrics 歌词数组
- * @param idx 当前行索引
- * @returns 安全的结束时间（秒）
- */
-const getSafeEndTime = (lyrics: LyricLine[], idx: number) => {
-  const cur = lyrics?.[idx];
-  const next = lyrics?.[idx + 1];
-  const curEnd = Number(cur?.endTime);
-  const curStart = Number(cur?.startTime);
-  if (Number.isFinite(curEnd) && curEnd > curStart) return curEnd;
-  const nextStart = Number(next?.startTime);
-  if (Number.isFinite(nextStart) && nextStart > curStart) return nextStart;
-  // 无有效结束参照：返回 0（表示无时长，不滚动）
-  return 0;
-};
-
-/**
  * 占位歌词行
  * @param word 占位词
  * @returns 占位歌词行数组
@@ -277,7 +266,7 @@ const placeholder = (word: string): RenderLine[] => [
     line: {
       startTime: 0,
       endTime: 0,
-      words: [{ word, startTime: 0, endTime: 0, romanWord: "" }],
+      words: [{ word, startTime: 0, endTime: 0 }],
       translatedLyric: "",
       romanLyric: "",
       isBG: false,
@@ -326,7 +315,7 @@ const renderLyricLines = computed<RenderLine[]>(() => {
     return placeholder("SPlayer Desktop Lyric");
   }
   // 加载中
-  if (lyricData.lyricLoading) return placeholder("歌词加载中...");
+  if (lyricData.lyricLoading && !lyrics?.length) return placeholder("歌词加载中...");
   // 纯音乐
   if (!lyrics?.length) return placeholder("纯音乐，请欣赏");
   // 获取当前歌词索引
@@ -354,7 +343,6 @@ const renderLyricLines = computed<RenderLine[]>(() => {
               word: current.translatedLyric,
               startTime: current.startTime,
               endTime: safeEnd,
-              romanWord: "",
             },
           ],
           translatedLyric: "",
@@ -729,6 +717,12 @@ onMounted(() => {
   window.electron.ipcRenderer.on(
     "desktop-lyric:update-data",
     (_event, data: LyricData & { sendTimestamp?: number }) => {
+      if (shouldIgnoreLoadingUpdate(data)) {
+        if (isInitializing.value) {
+          isInitializing.value = false;
+        }
+        return;
+      }
       Object.assign(lyricData, data);
       // 首次接收到歌词数据时，立即结束初始化状态
       if (isInitializing.value) {

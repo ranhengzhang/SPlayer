@@ -55,7 +55,12 @@
 </template>
 
 <script setup lang="ts">
-import { LyricLineMouseEvent, type LyricLine } from "@applemusic-like-lyrics/core";
+import {
+  LyricLineMouseEvent,
+  LyricPlayer as CoreLyricPlayer,
+  type LyricLine,
+} from "@applemusic-like-lyrics/core";
+import { type LyricPlayerRef } from "@/components/AMLL/LyricPlayer.vue";
 import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
 import { getLyricLanguage } from "@/utils/format";
 import { usePlayerController } from "@/core/player/PlayerController";
@@ -75,7 +80,7 @@ const statusStore = useStatusStore();
 const settingStore = useSettingStore();
 const player = usePlayerController();
 
-const lyricPlayerRef = ref<any | null>(null);
+const lyricPlayerRef = ref<LyricPlayerRef | null>(null);
 
 // 当前歌词
 const amLyricsData = computed(() => {
@@ -94,7 +99,7 @@ const amLyricsData = computed(() => {
     // 处理显隐
     if (!showTran) line.translatedLyric = "";
     if (!showRoma) line.romanLyric = "";
-    if (!showWordsRoma) line.words?.forEach((word) => (word.romanWord = ""));
+    if (!showWordsRoma) line.words?.forEach((word) => delete word.romanWord);
     // 调换翻译与音译位置
     if (swapTranRoma) {
       const temp = line.translatedLyric;
@@ -115,29 +120,50 @@ const hasDuet = computed(() => amLyricsData.value?.some((line) => line.isDuet) ?
 // 进度跳转
 const jumpSeek = (line: LyricLineMouseEvent) => {
   const lineContent = line.line.getLine();
-  if (!lineContent?.startTime) return;
-  const time = lineContent.startTime;
+  const lyricTargetTime = lineContent?.startTime;
+  if (
+    typeof lyricTargetTime !== "number" ||
+    !Number.isFinite(lyricTargetTime) ||
+    lyricTargetTime < 0
+  ) {
+    return;
+  }
+  // 让 LyricPlayer 跳转到目标时间，第二个参数 isSeek = true 会重置滚动状态
+  lyricPlayerRef.value?.setCurrentTime(lyricTargetTime, true);
+  // 获取偏移时间，计算歌曲真实的目标时间，并跳转
   const offsetMs = statusStore.getSongOffset(musicStore.playSong?.id);
-  player.setSeek(time - offsetMs);
+  const musicTargetTime = lyricTargetTime - offsetMs;
+  player.setSeek(musicTargetTime);
   player.play();
 };
 
 // 处理歌词语言
 const processLyricLanguage = (player = lyricPlayerRef.value) => {
-  const lyricLineObjects = player?.lyricPlayer?.currentLyricLineObjects;
-  if (!Array.isArray(lyricLineObjects) || lyricLineObjects.length === 0) {
+  const lyricGroups = (player?.lyricPlayer as CoreLyricPlayer | undefined)?.currentLyricGroups;
+  if (!Array.isArray(lyricGroups) || lyricGroups.length === 0) {
     return;
   }
-  // 遍历歌词行
-  for (let e of lyricLineObjects) {
+
+  // 遍历主歌词行
+  for (const group of lyricGroups) {
+    const lyricLine = group.mainLine?.getLine();
+    const lyricLineElement = group.mainLine?.getElement();
+    if (!lyricLine || !lyricLineElement) continue;
+
     // 获取歌词行内容 (合并逐字歌词为一句)
-    const content = e.lyricLine.words.map((word: any) => word.word).join("");
+    const content = lyricLine.words.map((word) => word.word).join("");
     // 跳过空行
     if (!content) continue;
     // 获取歌词语言
     const lang = getLyricLanguage(content);
+
     // 为主歌词设置 lang 属性 (firstChild 获取主歌词 不为翻译和音译设置属性)
-    e.element.firstChild.setAttribute("lang", lang);
+    const lyricMainLineElement = lyricLineElement.firstChild;
+    if (lyricMainLineElement instanceof HTMLElement) {
+      lyricMainLineElement.setAttribute("lang", lang);
+    } else {
+      console.warn("无法获取歌词行元素的主歌词部分，无法设置 lang 属性", lyricLineElement);
+    }
   }
 };
 
@@ -209,43 +235,6 @@ watch(lyricPlayerRef, (player) => {
     :deep(.am-lyric) {
       margin: 0;
       padding: 0 80px;
-    }
-  }
-
-  /* 对常见的“当前高亮行”类名应用加法混合模式，使其高亮更亮 */
-  :deep(.am-lyric .current),
-  :deep(.am-lyric .is-current),
-  :deep(.am-lyric .active),
-  :deep(.am-lyric .is-active),
-  :deep(.am-lyric .lyric-line.current),
-  :deep(.am-lyric .lyric-line.is-current) {
-    /* 使用加法混合，叠加会更亮 */
-    mix-blend-mode: plus-lighter;
-    /* 更亮的文字颜色（半透明白），便于加法叠加效果 */
-    color: rgba(255, 255, 255, 0.95);
-    /* 轻微发光，配合混合模式效果更自然 */
-    text-shadow: 0 2px 12px rgba(255, 255, 255, 0.06);
-    /* 告诉浏览器该元素可能会变化，优化渲染 */
-    will-change: transform, opacity, color;
-  }
-
-  /* 只对主歌词文本（非翻译/音译）启用混合，匹配带有 lang 属性的主元素 */
-  :deep(.am-lyric [lang]) {
-    /* 默认保持正常，但在高亮时会被上面的规则覆盖 */
-    -webkit-font-smoothing: antialiased;
-  }
-
-  /* 若浏览器不支持 plus-lighter，使用 supports 提供降级样式 */
-  @supports not (mix-blend-mode: plus-lighter) {
-    :deep(.am-lyric .current),
-    :deep(.am-lyric .is-current),
-    :deep(.am-lyric .active),
-    :deep(.am-lyric .is-active),
-    :deep(.am-lyric .lyric-line.current),
-    :deep(.am-lyric .lyric-line.is-current) {
-      /* 降级为更明显的颜色与阴影（非混合） */
-      color: #ffffff;
-      text-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
     }
   }
 

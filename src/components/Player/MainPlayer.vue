@@ -97,8 +97,12 @@
               <!-- 歌手 -->
               <div v-else class="artists">
                 <TextContainer :speed="0.5" class="artists-container">
-                  <n-text v-if="musicStore.playSong.type === 'radio'" class="ar-item">
-                    播客电台
+                  <n-text
+                    v-if="musicStore.playSong.type === 'radio'"
+                    class="ar-item"
+                    @click="showCreatorTip"
+                  >
+                    {{ musicStore.playSong.dj?.creator || "未知艺术家" }}
                   </n-text>
                   <template v-else-if="Array.isArray(musicStore.playSong.artists)">
                     <n-text
@@ -146,7 +150,12 @@
       <div
         v-if="statusStore.personalFmMode"
         class="play-icon"
-        v-debounce="() => songManager.personalFMTrash(musicStore.personalFMSong?.id)"
+        v-debounce="
+          () =>
+            songManager.personalFMTrash(musicStore.personalFMSong?.id, () =>
+              player.nextOrPrev('next'),
+            )
+        "
       >
         <SvgIcon class="icon" :size="18" name="ThumbDown" />
       </div>
@@ -384,10 +393,9 @@ const songMoreOptions = computed<DropdownOption[]>(() => {
       show: !isLocal,
       props: {
         onClick: () => {
-          statusStore.$patch({
-            showFullPlayer: true,
-            showPlayerComment: true,
-          });
+          const id = musicStore.playSong.id;
+          const type = musicStore.playSong.type === "radio" ? 4 : 0;
+          router.push({ name: "comment", query: { id, type } });
         },
       },
       icon: renderIcon("Message"),
@@ -419,6 +427,9 @@ const instantLyrics = computed(() => {
     ? `${contentStr}（ ${content?.translatedLyric} ）`
     : contentStr || "";
 });
+
+// 暂不支持查看主播主页
+const showCreatorTip = () => window.$message.info("暂不支持查看主播主页");
 </script>
 
 <style lang="scss" scoped>
