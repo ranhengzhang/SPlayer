@@ -1,8 +1,10 @@
 import { songDetail } from "@/api/song";
 import { formatSongsList } from "@/utils/format";
 import { usePlayerController } from "@/core/player/PlayerController";
+import router from "@/router";
+import { openCopySongInfo } from "@/utils/modal";
 
-class OrpheusData {
+class ProtocolData {
   constructor(type: string, id: number, cmd: string) {
     this.type = type;
     this.id = id;
@@ -32,13 +34,16 @@ export const handleProtocolUrl = (url: string) => {
     case url.startsWith("orpheus://"):
       handleOpenOrpheus(url);
       break;
+    case url.startsWith("splayer://"):
+      handleOpenSplayer(url);
+      break;
     default:
       break;
   }
 };
 
 export const handleOpenOrpheus = async (url: string) => {
-  const data = parseOrpheus(url);
+  const data = parseProtocolData(url, "orpheus");
   if (!data) return;
   console.log("🚀 Open Orpheus:", data);
 
@@ -52,14 +57,53 @@ export const handleOpenOrpheus = async (url: string) => {
   }
 };
 
-const parseOrpheus = (url: string): OrpheusData | undefined => {
-  // 这里的协议是从网页端打开官方客户端的协议
+/**
+ * 处理 splayer:// 协议
+ * 参数为歌曲 ID，跳转到歌曲所属专辑页面，并打开歌曲详情复制弹窗
+ * 形如 `splayer://1826361712`
+ */
+export const handleOpenSplayer = async (url: string) => {
+  const songId = parseSplayerId(url);
+  if (!songId) return;
+
+  const result = await songDetail(songId);
+  const song = formatSongsList(result.songs)[0];
+  if (!song) {
+    window.$message.error("获取歌曲详情失败");
+    return;
+  }
+  // 跳转到专辑页面
+  if (typeof song.album === "object" && song.album.id) {
+    router.push({ name: "album", query: { id: song.album.id } });
+  }
+  // 打开歌曲详情复制弹窗
+  openCopySongInfo(songId);
+};
+
+/**
+ * 从 splayer:// URL 中解析歌曲 ID
+ */
+const parseSplayerId = (url: string): number | undefined => {
+  if (!url.startsWith("splayer://")) return;
+  const raw = url.replace("splayer://", "").replace(/\/+$/, "");
+  const id = Number(raw);
+  if (!raw || Number.isNaN(id)) {
+    console.error("❌ Invalid SPlayer protocol URL:", url);
+    return;
+  }
+  return id;
+};
+
+const parseProtocolData = (url: string, scheme: string): ProtocolData | undefined => {
+  // 自定义协议格式
   // 形如 `orpheus://eyJ0eXBlIjoic29uZyIsImlkIjoiMTgyNjM2MTcxMiIsImNtZCI6InBsYXkifQ==`
+  // 或 `splayer://eyJ0eXBlIjoic29uZyIsImlkIjoiMTgyNjM2MTcxMiIsImNtZCI6InBsYXkifQ==`
   // URI 的 Path 部分是 Base64 编码过的，解码后得到 Json
   // 形如 `{"type":"song","id":"1826361712","cmd":"play"}`
 
-  if (!url.startsWith("orpheus://")) return;
-  let path = url.replace("orpheus://", "");
+  const prefix = `${scheme}://`;
+  if (!url.startsWith(prefix)) return;
+  let path = url.replace(prefix, "");
   // 移除末尾可能存在的斜杠
   if (path.endsWith("/")) {
     path = path.slice(0, -1);
@@ -84,10 +128,10 @@ const parseOrpheus = (url: string): OrpheusData | undefined => {
     console.error("❌ Failed to decode base64:", path, e);
     return;
   }
-  let data: OrpheusData;
+  let data: ProtocolData;
   try {
     const json = JSON.parse(jsonString);
-    data = new OrpheusData(json.type, json.id, json.cmd);
+    data = new ProtocolData(json.type, json.id, json.cmd);
   } catch (e) {
     console.error("❌ Invalid Data:", e);
     return;

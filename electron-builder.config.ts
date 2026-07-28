@@ -68,6 +68,10 @@ const config: Configuration = {
         name: "Orpheus Protocol",
         schemes: ["orpheus"],
       },
+      {
+        name: "SPlayer Protocol",
+        schemes: ["splayer"],
+      },
     ],
   },
   // NSIS 安装器配置
@@ -126,6 +130,10 @@ const config: Configuration = {
           CFBundleURLName: "Orpheus Protocol",
           CFBundleURLSchemes: ["orpheus"],
         },
+        {
+          CFBundleURLName: "SPlayer Protocol",
+          CFBundleURLSchemes: ["splayer"],
+        },
       ],
     },
     target: [
@@ -183,7 +191,7 @@ const config: Configuration = {
     desktop: {
       entry: {
         // 注册协议
-        MimeType: "x-scheme-handler/orpheus;",
+        MimeType: "x-scheme-handler/orpheus;x-scheme-handler/splayer;",
       },
     },
     syncDesktopName: true,

@@ -74,6 +74,11 @@ export const useGeneralSettings = (): SettingConfig => {
     sendRegisterProtocol("orpheus", isRegistry);
   };
 
+  // SPlayer 协议
+  const handleSplayerChange = async (isRegistry: boolean) => {
+    sendRegisterProtocol("splayer", isRegistry);
+  };
+
   // --- Backup & Restore Logic (from other.ts) ---
   const exportSettings = async () => {
     try {
@@ -255,6 +260,19 @@ export const useGeneralSettings = (): SettingConfig => {
               set: (v) => {
                 settingStore.registryProtocol.orpheus = v;
                 handleOrpheusChange(v);
+              },
+            }),
+          },
+          {
+            key: "splayerProtocol",
+            label: "通过 SPlayer 协议唤起本应用",
+            type: "switch",
+            description: "启用后可通过 splayer:// 协议唤起本应用，并跳转到对应歌曲的专辑页与详情弹窗",
+            value: computed({
+              get: () => settingStore.registryProtocol.splayer,
+              set: (v) => {
+                settingStore.registryProtocol.splayer = v;
+                handleSplayerChange(v);
               },
             }),
           },

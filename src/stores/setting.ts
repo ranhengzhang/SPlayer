@@ -428,6 +428,7 @@ export interface SettingState {
   /** 自定义协议注册 **/
   registryProtocol: {
     orpheus: boolean;
+    splayer: boolean;
   };
   /** Last.fm 集成 */
   lastfm: {
@@ -718,6 +719,7 @@ export const useSettingStore = defineStore("setting", {
     userAgreementVersion: "",
     registryProtocol: {
       orpheus: false,
+      splayer: true,
     },
     lastfm: {
       enabled: false,
